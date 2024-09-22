@@ -1,0 +1,56 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+*.env
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Cache and log files
+*.log
+*.csv
+*.tsv
+*.out
+*.err
+
+# Model files (Pre-trained or generated models)
+*.h5
+*.hdf5
+*.pkl
+*.pt
+*.bin
+*.ckpt
+
+# TensorFlow checkpoints
+checkpoint
+model.ckpt-*
+
+# Datasets
+data/
+dataset/
+*.json
+*.txt
+
+# Tokenizer / Vocabulary
+*.vocab
+*.spm
+*.bpe
+
+# Temporary or intermediate files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.orig
+*.dvc
+
+# Generated folders and files
+output/
+results/
+runs/
+logs/
