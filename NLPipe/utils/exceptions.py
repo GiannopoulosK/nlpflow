@@ -1,5 +1,8 @@
-class InvalidSpacyModelException(Exception):
+class InvalidModelException(Exception):
     pass
 
-class InvalidArgumentValue(Exception):
+class InvalidArgumentValueException(Exception):
+    pass
+
+class InvalidFunctionalityException(Exception):
     pass

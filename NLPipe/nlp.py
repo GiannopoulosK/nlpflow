@@ -1,13 +1,25 @@
+# NLPipe
+from NLPipe.utils.decorators import convert_input_to_string
+from NLPipe.utils.exceptions import InvalidModelException, InvalidArgumentValueException, InvalidFunctionalityException
+
+# Sentiment Analysis
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from textblob import TextBlob
+from transformers import AutoTokenizer, AutoConfig, RobertaForSequenceClassification
+nltk.download('vader_lexicon')
+nltk.download('punkt_tab')
+twitter_roberta = f"cardiffnlp/twitter-roberta-base-sentiment-latest"
+sia = SentimentIntensityAnalyzer()
+
+# Misc 
 import re
 import spacy
 from collections import Counter
-from NLPipe.utils.decorators import convert_input_to_string
-from NLPipe.utils.exceptions import InvalidSpacyModelException, InvalidArgumentValue
-import nltk
-nltk.download('vader_lexicon')
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-sia = SentimentIntensityAnalyzer()
-# NOTE Add: 
+from scipy.special import softmax
+import warnings
+warnings.simplefilter("ignore", FutureWarning)
+
 class NoiseRemover():
     """Remove noise in text with the spaCy NLP models."""
     
@@ -22,22 +34,8 @@ class NoiseRemover():
             self.nlp = spacy.load("en_core_web_sm")
             self.model_name = 'Small spaCy english model'
         else:
-            raise InvalidSpacyModelException("Invalid spaCy model. Please provide a valid spacy model name: ['large','medium','small']")
-          
-        ## For python >= 3.10    
-        # match spacy_model:
-        #     case 'large' | 'lg':
-        #         self.nlp = spacy.load("en_core_web_lg")
-        #         self.model_name = 'Large spaCy english model'
-        #     case 'medium' | 'md':
-        #         self.nlp = spacy.load("en_core_web_md")
-        #         self.model_name = 'Medium spaCy english model'
-        #     case 'small' | 'sm':
-        #         self.nlp = spacy.load("en_core_web_sm")
-        #         self.model_name = 'Small spaCy english model'
-        #     case _:
-        #         raise InvalidSpacyModelException("Invalid spaCy model. Please provide a valid spacy model name: ['large','medium','small']")
-            
+            raise InvalidModelException("Invalid spaCy model. Please provide a valid spacy model name: ['large','medium','small']")
+                      
     
     @convert_input_to_string
     def remove_html_tags(self, text):
@@ -143,13 +141,13 @@ class NoiseRemover():
             self.remove_mentions,
             self.remove_hashtags,
             self.remove_urls,
-            self.remove_special_characters,
             self.remove_stopwords,
             self.remove_punctuation,
-            self.remove_numbers,
-            self.remove_whitespace,
+            # self.remove_numbers,
             self.remove_accented_chars,
-            self.remove_successive_characters
+            self.remove_successive_characters,
+            self.remove_special_characters,
+            self.remove_whitespace
         ]
         
         steps = steps or default_steps
@@ -179,7 +177,7 @@ class Preprocessor:
             self.nlp = spacy.load("en_core_web_sm")
             self.model_name = 'Small spaCy english model'
         else:
-            raise InvalidSpacyModelException("Invalid spaCy model. Please provide a valid spacy model name: ['large','medium','small']")
+            raise InvalidModelException("Invalid spaCy model. Please provide a valid spacy model name: ['large','medium','small']")
     
     @convert_input_to_string
     def lemmatize(self, text):
@@ -234,7 +232,7 @@ class NamedEntityRecogniser:
             self.nlp = spacy.load("en_core_web_sm")
             self.model_name = 'Small spaCy english model'
         else:
-            raise InvalidSpacyModelException("Invalid spaCy model. Please provide a valid spacy model name: ['large','medium','small']")
+            raise InvalidModelException("Invalid spaCy model. Please provide a valid spacy model name: ['large','medium','small']")
     
     @convert_input_to_string
     def find_entities(self, text, result_type='dict'):
@@ -245,7 +243,7 @@ class NamedEntityRecogniser:
         elif result_type == 'list':
             return [(ent.text, ent.label_) for ent in doc.ents]
         else:
-            raise InvalidArgumentValue("Invalid argument. Please provide a valid result type: ['dict','list']")
+            raise InvalidArgumentValueException("Invalid argument. Please provide a valid result type: ['dict','list']")
         
     @convert_input_to_string
     def count_entities(self, text):
@@ -287,16 +285,85 @@ class POSTagger:
         return [(token.text, token.pos_, counter[token.pos_]) for token in doc]
 
 class SentimentAnalyser:
-    
-    def __init__(self, model="vader"):
-        """Analyze Sentiment with the spaCy NLP model"""
+    # Add BERT, XLNet, DistilBERT, search CoreNLP again
+    def __init__(self, model="roberta-twitter"):
+        """Initialize the SentimentAnalyser with the selected NLP model"""
+        self.model_name = model
+        self.tokenizer = None
+        self.config = None
+        
         if model == "vader":
-            self.model = sia
-            
-            
+            self.model = SentimentIntensityAnalyzer()
+        elif model == "textblob":
+            self.model = None  # TextBlob doesn't require initialization
+        elif model == "roberta-twitter":
+            twitter_roberta = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+            self.tokenizer = AutoTokenizer.from_pretrained(twitter_roberta)
+            self.config = AutoConfig.from_pretrained(twitter_roberta)
+            self.model = RobertaForSequenceClassification.from_pretrained(twitter_roberta)
+        else:
+            raise InvalidModelException("Invalid model selected. Please use a valid model value: ['roberta-twitter','vader','textblob']")
+    
     def get_sentiment(self, text):
-        return self.model.polarity_scores(text)['compound']
+        """Get overall sentiment score, label, and confidence, normalized"""
+        if self.model_name == "vader":
+            return self._vader_sentiment(text)
+        elif self.model_name == "textblob":
+            return self._textblob_sentiment(text)
+        elif self.model_name == "roberta-twitter":
+            return self._roberta_sentiment(text)
+        else:
+            raise InvalidModelException("Invalid model selected.")
+    
+    def _vader_sentiment(self, text):
+        sentiment_scores = self.model.polarity_scores(text)
+        sentiment_score = sentiment_scores['compound']
+        sentiment_label = self._get_sentiment_label(sentiment_score)
+        confidence = (sentiment_score + 1) / 2  # Normalize to range [0, 1]
+        return {"label": sentiment_label, "score": sentiment_score,"confidence": confidence}
+    
+    def _textblob_sentiment(self, text):
+        sentiment_score = TextBlob(text).sentiment.polarity
+        sentiment_label = self._get_sentiment_label(sentiment_score)
+        confidence = (abs(sentiment_score) + 1) / 2  # Normalize to range [0, 1]
+        return {"label": sentiment_label, "score": sentiment_score,"confidence": confidence}
+    
+    def _roberta_sentiment(self, text):
+        encoded_input = self.tokenizer(text, return_tensors='pt')
+        output = self.model(**encoded_input)
+        scores = output[0][0].detach().numpy()
+        scores = softmax(scores)
+
+        sentiment_label = self.config.id2label[scores.argmax()]
+        sentiment_score = scores[2] - scores[0]  # Sentiment score in range [-1, 1]
+        confidence = scores.max()
+
+        return {"label": sentiment_label, "score": sentiment_score,"confidence": confidence}
+    
+    @staticmethod
+    def _get_sentiment_label(score):
+        if score > 0.05:
+            return "positive"
+        elif score < -0.05:
+            return "negative"
+        else:
+            return "neutral"
     
     def get_sentiment_scores(self, text):
-        scores = self.model.polarity_scores(text)
-        return scores
+        """Get sentiment distribution scores"""
+        if self.model_name == "vader":
+            scores = self.model.polarity_scores(text)
+            return {'negative': scores['neg'], 'neutral': scores['neu'], 'positive': scores['pos']}
+        elif self.model_name == "textblob":
+            raise InvalidFunctionalityException("Invalid Functionality. TextBlob model does not provide detailed polarity scores.")
+        elif self.model_name == "roberta-twitter":
+            encoded_input = self.tokenizer(text, return_tensors='pt')
+            output = self.model(**encoded_input)
+            scores = output[0][0].detach().numpy()
+            scores = softmax(scores)
+            return {self.config.id2label[i]: score for i, score in enumerate(scores)}
+        else:
+            raise InvalidModelException("Invalid model selected. Please use a valid model value: ['roberta-twitter','vader','textblob']")
+        
+    def model_name_(self):
+        return self.model_name
