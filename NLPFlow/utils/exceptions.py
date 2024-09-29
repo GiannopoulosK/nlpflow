@@ -6,3 +6,6 @@ class InvalidArgumentValueException(Exception):
 
 class InvalidFunctionalityException(Exception):
     pass
+
+class LanguageNotSupported(Exception):
+    pass
