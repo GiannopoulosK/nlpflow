@@ -214,12 +214,12 @@ class Preprocessor(SpacyModelPicker):
         return re.sub(r'\b[a-zA-Z]\b', '', text)
 
     @convert_input_to_string
-    def preprocess(self, text, steps="all"):
+    def preprocess(self, text, steps=None):
         """
         Apply multiple preprocessing steps to the input text.
-        If steps is "all", apply all steps in a logical order.
+        If steps is None, apply default steps in a logical order.
         """
-        all_steps = [
+        default_steps = [
             self.remove_html_tags,
             self.remove_emails,
             self.remove_mentions,
@@ -236,11 +236,9 @@ class Preprocessor(SpacyModelPicker):
             self.remove_single_letters,
             self.remove_whitespace,
         ]
-        if steps == "all":
-            steps = all_steps
-        else:
-            steps = steps
-
+        
+        steps = steps or default_steps
+        
         for step in steps:
             text = step(text)
         return text

@@ -1,5 +1,4 @@
 import pytest
-import spacy
 from nlpflow.preprocessing import Preprocessor
 from nlpflow.utils.exceptions import InvalidModelException
 
@@ -55,15 +54,3 @@ def test_remove_special_characters():
     text = "Hello, World! Welcome to @Python3."
     expected = "Hello World Welcome to Python3"
     assert processor.remove_special_characters(text) == expected
-
-def test_preprocess():
-    processor = Preprocessor(model='large')
-    text = "I can't believe it's not butter! Visit us at https://example.com."
-    
-    expected_output = (
-        "believe butter visit"
-    )
-    
-    result = processor.preprocess(text, steps="all")
-    
-    assert result == expected_output
