@@ -207,14 +207,19 @@ class Preprocessor(SpacyModelPicker):
     def remove_successive_characters(self, text, max_repeats=2):
         """Remove excessive repeated characters, reducing to a specified maximum."""
         return re.sub(r'(.)\1{'+str(max_repeats)+',}', r'\1' * max_repeats, text)
+    
+    @convert_input_to_string
+    def remove_single_letters(self, text):
+        """Remove single letters that are not useful."""
+        return re.sub(r'\b[a-zA-Z]\b', '', text)
 
     @convert_input_to_string
-    def preprocess(self, text, steps=None):
+    def preprocess(self, text, steps="all"):
         """
         Apply multiple preprocessing steps to the input text.
-        If steps is None, apply default steps in a logical order.
+        If steps is "all", apply all steps in a logical order.
         """
-        default_steps = [
+        all_steps = [
             self.remove_html_tags,
             self.remove_emails,
             self.remove_mentions,
@@ -227,12 +232,15 @@ class Preprocessor(SpacyModelPicker):
             self.remove_punctuation,
             self.remove_accented_chars,
             self.remove_successive_characters,
+            self.lemmatize,
+            self.remove_single_letters,
             self.remove_whitespace,
-            self.lemmatize
         ]
-        
-        steps = steps or default_steps
-        
+        if steps == "all":
+            steps = all_steps
+        else:
+            steps = steps
+
         for step in steps:
             text = step(text)
         return text
