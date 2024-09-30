@@ -33,6 +33,48 @@ class Preprocessor(SpacyModelPicker):
     """Class to handle text preprocessing and noise removal tasks using spaCy NLP models."""
     
     @convert_input_to_string
+    def remove_contractions(self, text):
+        """Expands contractions in the text."""
+        contractions = {
+            "won't": "will not",
+            "can't": "cannot",
+            "n't": " not",
+            "'ve": " have",
+            "'re": " are",
+            "'m": " am",
+            "'ll": " will",
+            "'d": " would",
+            "i'm": "i am",
+            "you're": "you are",
+            "he's": "he is",
+            "she's": "she is",
+            "it's": "it is",
+            "we're": "we are",
+            "they're": "they are",
+            "i've": "i have",
+            "you've": "you have",
+            "we've": "we have",
+            "they've": "they have",
+            "i'd": "i would",
+            "you'd": "you would",
+            "he'd": "he would",
+            "she'd": "she would",
+            "we'd": "we would",
+            "they'd": "they would",
+            "i'll": "i will",
+            "you'll": "you will",
+            "he'll": "he will",
+            "she'll": "she will",
+            "we'll": "we will",
+            "they'll": "they will",
+        }
+        
+        for contraction, expansion in contractions.items():
+            text = re.sub(r'\b' + re.escape(contraction) + r'\b', expansion, text, flags=re.IGNORECASE)
+        
+        return text
+    
+    @convert_input_to_string
     def remove_html_tags(self, text):
         """Remove HTML tags from the text."""
         return re.sub(r'<[^>]+>', '', text)
@@ -115,6 +157,7 @@ class Preprocessor(SpacyModelPicker):
             self.remove_mentions,
             self.remove_hashtags,
             self.remove_urls,
+            self.remove_contractions,
             self.remove_special_characters,
             self.remove_numbers,
             self.remove_stopwords,

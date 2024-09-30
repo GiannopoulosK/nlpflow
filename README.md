@@ -1,14 +1,14 @@
-# NLPFlow
+# nlpflow
 
 ![Version](https://img.shields.io/badge/version-0.0.2-brightgreen) 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)
 
-NLPFlow is a Python library designed to simplify the process of building and deploying natural language processing (NLP) applications. It leverages well-established tools like `spaCy`, `scikit-learn`, and `optuna` for text preprocessing and model development. NLPFlow provides a powerful toolkit for automating NLP workflows, making it easier for data scientists and developers to efficiently build models.
+nlpflow is a Python library designed to simplify the process of building and deploying natural language processing (NLP) applications. It leverages well-established tools like `spaCy`, `scikit-learn`, and `optuna` for text preprocessing and model development. nlpflow provides a powerful toolkit for automating NLP workflows, making it easier for data scientists and developers to efficiently build models.
 
 ## Features
 
-Although NLPFlow is in early-stage development, it already offers the following:
+Although nlpflow is in early-stage development, it already offers the following:
 
 - A full text preprocessing pipeline with optional preprocessing steps.
 - Development of Naive Bayes models with hyperparameter tuning using Bayesian optimization.
@@ -23,20 +23,20 @@ Planned features include:
 
 ## Installation
 
-You can install NLPFlow using pip:
+You can install nlpflow using pip:
 
 ```bash
 pip install nlpflow
 ```
 
 ## Documentation
-Documentation is still under development. For example usage of the library, check the [examples.ipynb](https://github.com/GiannopoulosK/NLPFlow/blob/main/examples.ipynb) file.
+Documentation is still under development. For example usage of the library, check the [examples.ipynb](https://github.com/GiannopoulosK/nlpflow/blob/main/examples.ipynb) file.
 
 ## Contributing
 For contributions, please contact me directly on LinkedIn [here](https://www.linkedin.com/in/kongiannopoulos/).
 
 ## License
-This project is licensed under the [Apache License 2.0](https://github.com/GiannopoulosK/NLPFlow/blob/main/LICENSE).
+This project is licensed under the [Apache License 2.0](https://github.com/GiannopoulosK/nlpflow/blob/main/LICENSE).
 
 ## Acknowledgements
 Thanks to the developers and contributors of the libraries this tool depends on! Let's continue improving the open-source community together!
