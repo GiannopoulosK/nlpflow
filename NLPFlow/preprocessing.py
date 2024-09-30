@@ -1,6 +1,6 @@
-# NLPFlow
-from NLPFlow.utils.decorators import convert_input_to_string
-from NLPFlow.utils.exceptions import InvalidModelException
+# nlpflow
+from nlpflow.utils.decorators import convert_input_to_string
+from nlpflow.utils.exceptions import InvalidModelException
 
 # Misc 
 import re
