@@ -17,6 +17,7 @@ venv/
 *.tsv
 *.out
 *.err
+*.yml
 
 # Model files (Pre-trained or generated models)
 *.h5
