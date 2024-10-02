@@ -1,6 +1,6 @@
 # nlpflow
 
-![Version](https://img.shields.io/badge/version-0.0.4-blue) 
+![Version](https://img.shields.io/badge/version-0.0.4-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Python Version](https://img.shields.io/badge/python-3.0%2B-blue)
 

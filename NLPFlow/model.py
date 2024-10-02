@@ -4,6 +4,8 @@ from sklearn.model_selection import cross_val_score
 from sklearn.naive_bayes import MultinomialNB, ComplementNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
 import logging
 optuna.logging.set_verbosity(logging.WARNING)
 
@@ -134,7 +136,83 @@ class RandomForestStrategy(ModelStrategy):
             self.best_model.fit(X_train, y_train)
         return self.best_model
 
-class ModelTrainer:
+class SVMStrategy(ModelStrategy):
+    def __init__(self):
+        self.best_params = None
+        self.best_model = None
+
+    def objective(self, trial, X_train, y_train):
+        C = trial.suggest_float("C", 1e-4, 1e2, log=True)
+        kernel = trial.suggest_categorical("kernel", ["linear", "poly", "rbf", "sigmoid"])
+        if kernel == "poly":
+            degree = trial.suggest_int("degree", 2, 5)
+        else:
+            degree = 3
+        
+        gamma = trial.suggest_categorical("gamma", ["scale", "auto"])
+        
+        model = SVC(C=C, kernel=kernel, degree=degree, gamma=gamma, random_state=42)
+
+        score = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy').mean()
+        return score
+
+    def tune_model(self, X_train, y_train, n_trials=100, train_best=True):
+        study = optuna.create_study(direction="maximize")
+        
+        study.optimize(lambda trial: self.objective(trial, X_train, y_train), n_trials=n_trials)
+        
+        self.best_params = study.best_params
+        self.best_model = SVC(
+            C=self.best_params["C"],
+            kernel=self.best_params["kernel"],
+            degree=self.best_params.get("degree", 3),
+            gamma=self.best_params["gamma"],
+            random_state=42
+        )
+        
+        if train_best:
+            self.best_model.fit(X_train, y_train)
+        
+        return self.best_model
+
+class KNNStrategy(ModelStrategy):
+    def __init__(self):
+        self.best_params = None
+        self.best_model = None
+
+    def objective(self, trial, X_train, y_train):
+        n_neighbors = trial.suggest_int("n_neighbors", 1, 50)
+        weights = trial.suggest_categorical("weights", ["uniform", "distance"])
+        p = trial.suggest_int("p", 1, 2)
+
+        # Building the model
+        model = KNeighborsClassifier(
+            n_neighbors=n_neighbors,
+            weights=weights,
+            p=p
+        )
+        score = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy').mean()
+        return score
+
+    def tune_model(self, X_train, y_train, n_trials=100, train_best=True):
+        study = optuna.create_study(direction="maximize")
+        
+        study.optimize(lambda trial: self.objective(trial, X_train, y_train), n_trials=n_trials)
+        
+        self.best_params = study.best_params
+        
+        self.best_model = KNeighborsClassifier(
+            n_neighbors=self.best_params["n_neighbors"],
+            weights=self.best_params["weights"],
+            p=self.best_params["p"]
+        )
+        
+        if train_best:
+            self.best_model.fit(X_train, y_train)
+        
+        return self.best_model
+    
+class Classifier:
     def __init__(self, X_train, y_train, X_test, y_test):
         self.X_train = X_train
         self.y_train = y_train
@@ -146,7 +224,9 @@ class ModelTrainer:
             "MultinomialNB": MultinomialNBStrategy,
             "ComplementNB": ComplementNBStrategy,
             "LogisticRegression": LogisticRegressionStrategy(),
-            "RandomForest": RandomForestStrategy()
+            "RandomForest": RandomForestStrategy(),
+            "SVC": SVMStrategy(),
+            "KNeighbors": KNNStrategy()
         }
 
     def tune_and_select_best(self, model_names, n_trials=100):
