@@ -1,8 +1,139 @@
+from abc import ABC, abstractmethod
 import optuna
 from sklearn.model_selection import cross_val_score
 from sklearn.naive_bayes import MultinomialNB, ComplementNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 import logging
 optuna.logging.set_verbosity(logging.WARNING)
+
+class ModelStrategy(ABC):
+    @abstractmethod
+    def tune_model(self, X_train, y_train, n_trials):
+        pass
+
+    @abstractmethod
+    def train_and_evaluate(self, X_train, y_train, X_test, y_test):
+        pass
+    
+class MultinomialNBStrategy(ModelStrategy):
+    def __init__(self):
+        self.best_params = None
+        self.best_model = None
+
+    def objective(self, trial, X_train, y_train):
+        alpha = trial.suggest_float("alpha", 1e-3, 10.0, log=True)
+        model = MultinomialNB(alpha=alpha)
+        score = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy').mean()
+        return score
+
+    def tune_model(self, X_train, y_train, n_trials=100, train_best=True):
+        study = optuna.create_study(direction="maximize")
+        study.optimize(lambda trial: self.objective(trial, X_train, y_train), n_trials=n_trials)
+        self.best_params = study.best_params
+        self.best_model = MultinomialNB(alpha=self.best_params["alpha"])
+        if train_best:
+            self.best_model.fit(X_train, y_train)
+        return self.best_model
+
+class ComplementNBStrategy(ModelStrategy):
+    def __init__(self):
+        self.best_params = None
+        self.best_model = None
+
+    def objective(self, trial, X_train, y_train):
+        alpha = trial.suggest_float("alpha", 1e-3, 10.0, log=True)
+        model = ComplementNB(alpha=alpha)
+        score = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy').mean()
+        return score
+
+    def tune_model(self, X_train, y_train, n_trials=100, train_best=True):
+        study = optuna.create_study(direction="maximize")
+        study.optimize(lambda trial: self.objective(trial, X_train, y_train), n_trials=n_trials)
+        self.best_params = study.best_params
+        self.best_model = ComplementNB(alpha=self.best_params["alpha"])
+        if train_best:
+            self.best_model.fit(X_train, y_train)
+        return self.best_model
+    
+class LogisticRegressionStrategy(ModelStrategy):
+    def __init__(self):
+        self.best_params = None
+        self.best_model = None
+
+    def objective(self, trial, X_train, y_train):
+        C = trial.suggest_float("C", 1e-3, 10.0, log=True)
+        penalty = trial.suggest_categorical("penalty", ["l1", "l2"])
+        
+        if penalty == 'l1':
+            solver = trial.suggest_categorical("solver", ["liblinear", "saga"])
+        else:
+            solver = trial.suggest_categorical("solver", ["lbfgs", "liblinear", "saga"])
+            
+        max_iter = trial.suggest_int("max_iter", 100, 1000)
+        tol = trial.suggest_float("tol", 1e-5, 1e-1, log=True)
+        model = LogisticRegression(C=C, penalty=penalty, solver=solver, max_iter=max_iter, tol=tol)
+        score = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy').mean()
+        return score
+
+    def tune_model(self, X_train, y_train, n_trials=100, train_best=True):
+        study = optuna.create_study(direction="maximize")
+        study.optimize(lambda trial: self.objective(trial, X_train, y_train), n_trials=n_trials)
+        self.best_params = study.best_params
+        
+        self.best_model = LogisticRegression(
+            C=self.best_params["C"],
+            penalty=self.best_params["penalty"],
+            solver=self.best_params["solver"],
+            max_iter=self.best_params["max_iter"],
+            tol=self.best_params["tol"]
+        )
+        if train_best:
+            self.best_model.fit(X_train, y_train)
+        return self.best_model
+    
+class RandomForestStrategy(ModelStrategy):
+    def __init__(self):
+        self.best_params = None
+        self.best_model = None
+
+    def objective(self, trial, X_train, y_train):
+        n_estimators = trial.suggest_int("n_estimators", 50, 500)
+        max_depth = trial.suggest_int("max_depth", 2, 50)
+        min_samples_split = trial.suggest_int("min_samples_split", 2, 20)
+        min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 20)
+        max_features = trial.suggest_categorical("max_features", ["auto", "sqrt", "log2"])
+
+        model = RandomForestClassifier(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            random_state=42
+        )
+
+        score = cross_val_score(model, X_train, y_train, cv=5, scoring='accuracy').mean()
+        return score
+
+    def tune_model(self, X_train, y_train, n_trials=100, train_best=True):
+        study = optuna.create_study(direction="maximize")
+        study.optimize(lambda trial: self.objective(trial, X_train, y_train), n_trials=n_trials)
+        self.best_params = study.best_params
+        
+        self.best_model = RandomForestClassifier(
+            n_estimators=self.best_params["n_estimators"],
+            max_depth=self.best_params["max_depth"],
+            min_samples_split=self.best_params["min_samples_split"],
+            min_samples_leaf=self.best_params["min_samples_leaf"],
+            max_features=self.best_params["max_features"],
+            random_state=42
+        )
+        
+        if train_best:
+            self.best_model.fit(X_train, y_train)
+        return self.best_model
+
 class ModelTrainer:
     def __init__(self, X_train, y_train, X_test, y_test):
         self.X_train = X_train
@@ -10,61 +141,33 @@ class ModelTrainer:
         self.X_test = X_test
         self.y_test = y_test
         self.best_model = None
-        self.best_alpha = None
-        self.best_score = 0
-
-    def objective_multinomial(self, trial):
-        alpha = trial.suggest_float("alpha", 1e-3, 10.0, log=True)
-        model = MultinomialNB(alpha=alpha)
         
-        score = cross_val_score(model, self.X_train, self.y_train, cv=5, scoring='accuracy').mean()
-        
-        return score
+        self.model_registry = {
+            "MultinomialNB": MultinomialNBStrategy,
+            "ComplementNB": ComplementNBStrategy,
+            "LogisticRegression": LogisticRegressionStrategy(),
+            "RandomForest": RandomForestStrategy()
+        }
 
-    def objective_complement(self, trial):
-        alpha = trial.suggest_float("alpha", 1e-3, 10.0, log=True)
-        model = ComplementNB(alpha=alpha)
+    def tune_and_select_best(self, model_names, n_trials=100):
+        model_accuracies = {}
 
-        score = cross_val_score(model, self.X_train, self.y_train, cv=5, scoring='accuracy').mean()
-        
-        return score
+        for model_name in model_names:
+            if model_name in self.model_registry:
+                strategy = self.model_registry[model_name]()
+                print(f"Tuning {model_name}...")
+                strategy.tune_model(self.X_train, self.y_train, n_trials=n_trials)
+                accuracy, model = strategy.train_and_evaluate(self.X_train, self.y_train, self.X_test, self.y_test)
+                print(f"{model_name} accuracy: {accuracy:.4f}")
+                model_accuracies[model_name] = (accuracy, model)
+            else:
+                print(f"Model {model_name} is not recognized. Available models: {list(self.model_registry.keys())}")
 
-    def trial_callback(self, study, trial):
-        # Print status every 10 trials
-        if trial.number % 10 == 0:
-            print(f"Trial {trial.number} completed. Best value so far: {study.best_value}, Best params: {study.best_params}")
-            
-    def tune_models(self):
-        # Tune MultinomialNB
-        study_multinomial = optuna.create_study(direction="maximize")
-        study_multinomial.optimize(self.objective_multinomial, n_trials=100, callbacks=[self.trial_callback])
-
-        # Store best MultinomialNB model
-        self.best_alpha = study_multinomial.best_params['alpha']
-        self.best_model = MultinomialNB(alpha=self.best_alpha)
-
-        # Train the best model
-        self.best_model.fit(self.X_train, self.y_train)
-        multinomial_accuracy = self.best_model.score(self.X_test, self.y_test)
-        print(f"Best MultinomialNB alpha: {self.best_alpha}, Accuracy: {multinomial_accuracy:.4f}")
-
-        # Now tune ComplementNB
-        study_complement = optuna.create_study(direction="maximize")
-        study_complement.optimize(self.objective_complement, n_trials=100, callbacks=[self.trial_callback])
-
-        # Store best ComplementNB model
-        complement_alpha = study_complement.best_params['alpha']
-        complement_model = ComplementNB(alpha=complement_alpha)
-
-        # Train the best ComplementNB model
-        complement_model.fit(self.X_train, self.y_train)
-        complement_accuracy = complement_model.score(self.X_test, self.y_test)
-        print(f"Best ComplementNB alpha: {complement_alpha}, Accuracy: {complement_accuracy:.4f}")
-
-        # Compare models and select the best one
-        if multinomial_accuracy > complement_accuracy:
-            print(f"MultinomialNB is the best model with alpha = {self.best_alpha} and accuracy score = {multinomial_accuracy}")
+        if model_accuracies:
+            best_model_name = max(model_accuracies, key=lambda name: model_accuracies[name][0])
+            self.best_model = model_accuracies[best_model_name][1]
+            print(f"The best model is {best_model_name} with accuracy {model_accuracies[best_model_name][0]:.4f}")
             return self.best_model
         else:
-            print(f"ComplementNB is the best model with alpha = {complement_alpha} and accuracy score = {complement_accuracy}")
-            return complement_model
+            print("No valid models were selected.")
+            return None

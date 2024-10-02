@@ -1,6 +1,6 @@
 # nlpflow
 from nlpflow.utils.decorators import convert_input_to_string
-from nlpflow.utils.exceptions import InvalidModelException
+from nlpflow.utils.exceptions import InvalidModelException, InvalidArgumentValueException
 
 # Misc 
 import re
@@ -199,7 +199,7 @@ class Preprocessor(SpacyModelPicker):
         return " ".join([token.lemma_ for token in doc])
 
     @convert_input_to_string
-    def remove_accented_chars(self, text):
+    def remove_accented_characters(self, text):
         """Remove accented characters from the text."""
         return "".join([c for c in text if ord(c) < 128])
 
@@ -214,11 +214,29 @@ class Preprocessor(SpacyModelPicker):
         return re.sub(r'\b[a-zA-Z]\b', '', text)
 
     @convert_input_to_string
-    def preprocess(self, text, steps=None):
+    def preprocess(self, text, remove_from_text = "auto", lemmatize=True):
         """
         Apply multiple preprocessing steps to the input text.
-        If steps is None, apply default steps in a logical order.
+        If 'remove_from_text' is specified as 'auto' or 'all', apply the default steps.
+        Otherwise, apply only the specified steps in 'remove_from_text'.
         """
+        step_mapping = {
+            'html_tags': self.remove_html_tags,
+            'emails': self.remove_emails,
+            'mentions': self.remove_mentions,
+            'hashtags': self.remove_hashtags,
+            'urls': self.remove_urls,
+            'contractions': self.remove_contractions,
+            'special_characters': self.remove_special_characters,
+            'numbers': self.remove_numbers,
+            'stopwords': self.remove_stopwords,
+            'punctuation': self.remove_punctuation,
+            'accented_characters': self.remove_accented_characters,
+            'successive_characters': self.remove_successive_characters,
+            'single_letters': self.remove_single_letters,
+            'whitespace': self.remove_whitespace,
+        }
+        
         default_steps = [
             self.remove_html_tags,
             self.remove_emails,
@@ -230,21 +248,36 @@ class Preprocessor(SpacyModelPicker):
             self.remove_numbers,
             self.remove_stopwords,
             self.remove_punctuation,
-            self.remove_accented_chars,
+            self.remove_accented_characters,
             self.remove_successive_characters,
             self.lemmatize,
             self.remove_single_letters,
             self.remove_whitespace,
         ]
         
-        steps = steps or default_steps
+        steps_to_apply = []
+            
+        if remove_from_text == "auto" or remove_from_text == "all":
+            steps_to_apply = default_steps.copy()  
+        else:
+            if isinstance(remove_from_text, str):
+                remove_from_text = [remove_from_text]
+                
+            for item_to_remove in remove_from_text:
+                step_to_apply = step_mapping.get(item_to_remove)
+                if step_to_apply and step_to_apply not in steps_to_apply:
+                    steps_to_apply.append(step_to_apply)
         
-        for step in steps:
+        if lemmatize and self.lemmatize not in steps_to_apply:
+            steps_to_apply.append(self.lemmatize)
+           
+        for step in steps_to_apply:
             text = step(text)
+    
         return text
 
 
-class Vectorizer:
+class Vectorizer(SpacyModelPicker):
     def __init__(self, method='tfidf', ngram_range=(1, 1), max_features=None, model='large'):
         self.method = method
         self.ngram_range = ngram_range
@@ -263,6 +296,11 @@ class Vectorizer:
         """Fit the vectorizer to the text data."""
         if self.method in ['tfidf', 'count']:
             self.vectorizer.fit(text_data)
+        else:
+            if self.method == 'word_embeddings':
+                 warnings.warn("Word embeddings do not need to be fitted. The fit method will do nothing.", UserWarning)
+            else:
+                raise InvalidArgumentValueException("Invalid Argument. Choose from ['tfidf', 'count', 'word_embeddings']")
             
     def transform(self, text_data):
         """Transform text data into numerical vectors."""
@@ -274,16 +312,23 @@ class Vectorizer:
 
     def fit_transform(self, text_data):
         """Fit the vectorizer and then transform the text data."""
-        if self.method == 'tfidf' or self.method == 'count':
+        if self.method in ['tfidf', 'count']:
             return self.vectorizer.fit_transform(text_data)
 
         elif self.method == 'word_embeddings':
-            return np.array([self.get_word_embeddings(text) for text in text_data])
+            return self.get_word_embeddings(text_data)
+        else:
+            raise InvalidArgumentValueException("Invalid Argument. Choose from ['tfidf', 'count', 'word_embeddings']")
 
-    def get_word_embeddings(self, text):
-        """Generate word embeddings using spaCy."""
-        doc = self.nlp(text)
-        return doc.vector
+    def get_word_embeddings(self, text_data):
+        """Generate word embeddings using spaCy in batches."""
+        if self.method != "word_embeddings":
+            raise InvalidArgumentValueException("To get word embeddings, provide method 'word_embeddings' to the class")
+        embeddings = []
+        with self.nlp.disable_pipes():
+            for doc in self.nlp.pipe(text_data, batch_size=50):
+                embeddings.append(doc.vector)
+        return np.array(embeddings)
 
     def get_feature_names(self):
         """Get feature names from the vectorizer (only for tfidf and count)."""
