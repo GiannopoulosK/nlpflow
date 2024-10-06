@@ -4,8 +4,6 @@
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)
 
-![Logo](nlpflow\assets\NLPFlow-logo.jpg)
-
 nlpflow is a Python library designed to simplify the process of building and deploying natural language processing (NLP) applications. It leverages well-established tools like `spaCy`, `scikit-learn`, and `optuna` for text preprocessing and model development. nlpflow provides a powerful toolkit for automating NLP workflows, making it easier for data scientists and developers to efficiently build models.
 
 ## Features
