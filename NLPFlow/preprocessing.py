@@ -13,7 +13,7 @@ import numpy as np
 class SpacyModelPicker:
     """Base class for handling spaCy model selection."""
     
-    def __init__(self, model='large'):
+    def __init__(self, model='medium'):
         if model in ['large', 'lg']:
             self.nlp = spacy.load("en_core_web_lg")
             self.model_name = 'Large spaCy English model'
@@ -157,13 +157,12 @@ class Preprocessor(SpacyModelPicker):
         """Remove URLs from the text using spaCy."""
         doc = self.nlp(text)
         return " ".join(token.text for token in doc if not token.like_url)
-
+    
     @convert_input_to_string
     def remove_emails(self, text):
         """Remove emails from the text."""
-        regex_sub = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', text, flags=re.MULTILINE)
-        doc = self.nlp(regex_sub)
-        return " ".join(token.text for token in doc if not token.like_email)
+        return re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '', text, flags=re.MULTILINE)
+
 
     @convert_input_to_string
     def remove_special_characters(self, text):
